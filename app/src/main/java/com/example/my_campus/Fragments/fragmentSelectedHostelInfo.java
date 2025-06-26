@@ -14,6 +14,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.my_campus.HostelListAdapter;
 import com.example.my_campus.HostellListItem;
 import com.example.my_campus.ImageSliderAdapter;
@@ -93,6 +95,13 @@ public class fragmentSelectedHostelInfo extends Fragment {
                     String iconUrl = document.getString("icon");
 
                     if (name != null && designation != null && phoneNumber != null) {
+                        if (iconUrl != null && !iconUrl.isEmpty()) {
+                            // 🔄 Preload icon image to Glide cache
+                            Glide.with(requireContext())
+                                    .load(iconUrl)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .preload();
+                        }
                         hostelList.add(new HostellListItem(name, iconUrl, designation, phoneNumber));
                     }
                 }
@@ -116,13 +125,18 @@ public class fragmentSelectedHostelInfo extends Fragment {
                 imageList.removeAll(Collections.singleton(null));
                 imageList.removeAll(Collections.singleton(""));
 
+                // Preload all images into cache
+                for (String url : imageList) {
+                    Glide.with(requireContext())
+                            .load(url)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .preload();
+                }
+
+                // Set up the slider adapter
                 ImageSliderAdapter adapter = new ImageSliderAdapter(imageList);
                 imageSlider.setAdapter(adapter);
-
-                // Set the fancy page transformer
                 setFancyPageTransformer();
-
-                // Start auto-scroll
                 startAutoSlide(imageList.size());
             }
         });
@@ -147,24 +161,18 @@ public class fragmentSelectedHostelInfo extends Fragment {
         imageSlider.setPageTransformer(new ViewPager2.PageTransformer() {
             @Override
             public void transformPage(@NonNull View page, float position) {
-                page.setCameraDistance(20000); // 3D rotation depth effect
-
-                if (position < -1) { // Page bahar hai
-                    page.setAlpha(0f);
-                } else if (position <= 0) { // Left side swipe
-                    page.setAlpha(1f);
-                    page.setRotationY(90 * Math.abs(position)); // Rotate karta hai
-                    page.setTranslationX(-page.getWidth() * position);
-                } else if (position <= 1) { // Right side swipe
-                    page.setAlpha(1f);
-                    page.setRotationY(-90 * Math.abs(position));
-                    page.setTranslationX(-page.getWidth() * position);
-                } else { // Page bahar hai
-                    page.setAlpha(0f);
+                if (position < -1 || position > 1) {
+                    page.setAlpha(0f); // Off-screen pages invisible
+                } else {
+                    // Zoom out and fade effect
+                    page.setScaleX(0.85f + (1 - Math.abs(position)) * 0.15f);
+                    page.setScaleY(0.85f + (1 - Math.abs(position)) * 0.15f);
+                    page.setAlpha(0.5f + (1 - Math.abs(position)) * 0.5f);
                 }
             }
         });
     }
+
 
 
     private String getHostelFullName(String hostel) {

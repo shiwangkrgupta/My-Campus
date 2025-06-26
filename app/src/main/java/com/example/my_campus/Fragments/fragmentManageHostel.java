@@ -2,8 +2,10 @@ package com.example.my_campus.Fragments;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +13,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -21,9 +24,11 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.fragment.app.Fragment;
 
 import com.example.my_campus.R;
+import com.example.my_campus.utility;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.yalantis.ucrop.UCrop;
 
 import java.io.File;
@@ -31,10 +36,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class fragmentManageHostel extends Fragment {
+
     private EditText nameEdit, designationEdit, phoneEdit;
     private Spinner hostelEdit;
     private ConstraintLayout uploadBtn;
-    private ImageView selectedImage;
+    private ImageView btnReset;
+    private TextView selectedImageName;
+    utility ut = new utility();
     private Uri selectedImageUri, croppedImageUri;
     private FirebaseStorage storage;
     private FirebaseFirestore firestore;
@@ -47,41 +55,49 @@ public class fragmentManageHostel extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_manage_hostel, container, false);
 
+        // UI references
         nameEdit = view.findViewById(R.id.nameEdit);
         designationEdit = view.findViewById(R.id.designationEdit);
         phoneEdit = view.findViewById(R.id.phoneEdit);
         hostelEdit = view.findViewById(R.id.hostelEdit);
+        selectedImageName = view.findViewById(R.id.selectedImageName);
+        btnReset = view.findViewById(R.id.btnReset);
+        uploadBtn = view.findViewById(R.id.uploadBtn);
 
-        // Setup Spinner
+        // Firebase
+        storage = FirebaseStorage.getInstance();
+        firestore = FirebaseFirestore.getInstance();
+
+        // Spinner setup
         String[] hostel = {"Select Hostel", "aryabhata", "buddha", "chanakya", "godavari"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, hostel);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         hostelEdit.setAdapter(adapter);
 
-        //Buttons
+
+
+        btnReset.setOnClickListener(v -> resetSelectedImage());
+        if (selectedImageUri == null) btnReset.setVisibility(View.GONE);
+
         View selectImageBtn = view.findViewById(R.id.selectImageBtn);
-        uploadBtn = view.findViewById(R.id.uploadBtn);
-        selectedImage = view.findViewById(R.id.selectedImage);
+        selectImageBtn.setOnClickListener(v -> openImagePicker());
+        uploadBtn.setOnClickListener(v -> uploadStaff());
 
-        storage = FirebaseStorage.getInstance();
-        firestore = FirebaseFirestore.getInstance();
-
-        // Initialize image picker launcher
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                         selectedImageUri = result.getData().getData();
-                        cropImage();
+                        if (selectedImageUri != null) {
+                            cropImage();
+                            btnReset.setVisibility(View.VISIBLE);
+                            selectedImageName.setText(getFileNameFromUri(selectedImageUri));
+                        }
                     }
-                }
-        );
+                });
 
-        selectImageBtn.setOnClickListener(v -> openImagePicker());
-        uploadBtn.setOnClickListener(v -> uploadStaff());
         return view;
-
     }
 
     private void openImagePicker() {
@@ -89,6 +105,23 @@ public class fragmentManageHostel extends Fragment {
         intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         imagePickerLauncher.launch(intent);
+    }
+
+
+    private void resetSelectedImage() {
+        selectedImageUri = null;
+        croppedImageUri = null;
+        selectedImageName.setText("");
+        uploadBtn.setVisibility(View.GONE);
+        btnReset.setVisibility(View.GONE);
+    }
+
+    private void resetAllFields() {
+        nameEdit.setText("");
+        designationEdit.setText("");
+        phoneEdit.setText("");
+        hostelEdit.setSelection(0); // Reset to "Select Branch"
+        resetSelectedImage();       // Clears image name, URI, hides buttons
     }
 
     private void cropImage() {
@@ -104,7 +137,6 @@ public class fragmentManageHostel extends Fragment {
         if (requestCode == UCrop.REQUEST_CROP && resultCode == Activity.RESULT_OK && data != null) {
             croppedImageUri = UCrop.getOutput(data);
             if (croppedImageUri != null) {
-                selectedImage.setImageURI(croppedImageUri);
                 uploadBtn.setVisibility(View.VISIBLE);
             }
         } else if (resultCode == UCrop.RESULT_ERROR) {
@@ -112,7 +144,6 @@ public class fragmentManageHostel extends Fragment {
             Toast.makeText(getContext(), "Crop error: " + (error != null ? error.getMessage() : "Unknown"), Toast.LENGTH_SHORT).show();
         }
     }
-
 
     private void uploadStaff() {
         String name = nameEdit.getText().toString().trim();
@@ -122,7 +153,8 @@ public class fragmentManageHostel extends Fragment {
         String fullHostelName = gethostelFullName(selectedHostel);
 
         if (croppedImageUri == null || name.isEmpty() ||
-                designation.isEmpty() || phone.isEmpty()) {
+                designation.isEmpty() || phone.isEmpty() ||
+                selectedHostel.equals("select hostel")) {
             Toast.makeText(getContext(), "All fields including image are required", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -130,7 +162,12 @@ public class fragmentManageHostel extends Fragment {
         String fileName = "staffImage/" + selectedHostel + "/" + name + ".jpg";
         StorageReference imageRef = storage.getReference().child(fileName);
 
-        imageRef.putFile(croppedImageUri)
+        UploadTask uploadTask = imageRef.putFile(croppedImageUri); // or selectedImageUri if no crop
+
+        // Show progress dialog (assuming ut.showUploadProgressDialog() is your custom utility)
+        ut.showUploadProgressDialog(requireContext(), uploadTask);
+
+        uploadTask
                 .addOnSuccessListener(taskSnapshot -> imageRef.getDownloadUrl()
                         .addOnSuccessListener(uri -> {
                             String imageUrl = uri.toString();
@@ -144,8 +181,10 @@ public class fragmentManageHostel extends Fragment {
 
                             firestore.document(path)
                                     .set(data)
-                                    .addOnSuccessListener(aVoid ->
-                                            Toast.makeText(getContext(), "Staff uploaded successfully", Toast.LENGTH_SHORT).show())
+                                    .addOnSuccessListener(aVoid ->{
+                                        Toast.makeText(getContext(), "Staff uploaded successfully", Toast.LENGTH_SHORT).show();
+                                        resetAllFields();
+                                    })
                                     .addOnFailureListener(e ->
                                             Toast.makeText(getContext(), "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
                         }))
@@ -153,13 +192,33 @@ public class fragmentManageHostel extends Fragment {
                         Toast.makeText(getContext(), "Image upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
+    private String getFileNameFromUri(Uri uri) {
+        String result = "";
+        if (uri.getScheme().equals("content")) {
+            try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                }
+            }
+        }
+        if (result == null || result.isEmpty()) {
+            result = uri.getLastPathSegment();
+        }
+        return result;
+    }
+
     private String gethostelFullName(String hostel) {
         switch (hostel) {
-            case "aryabhata": return "Aryabhatta Girls Hostel";
-            case "buddha": return "Buddha Boys Hostel";
-            case "chanakaya": return "Chanakya Boys Hostel";
-            case "godavari": return "Godavari Boys Hostel";
-            default: return hostel;
+            case "aryabhata":
+                return "Aryabhatta Girls Hostel";
+            case "buddha":
+                return "Buddha Boys Hostel";
+            case "chanakya":
+                return "Chanakya Boys Hostel";
+            case "godavari":
+                return "Godavari Boys Hostel";
+            default:
+                return hostel;
         }
     }
 }

@@ -12,6 +12,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.my_campus.CustomListAdapter;
 import com.example.my_campus.HostellListItem;
 import com.example.my_campus.ListItem;
@@ -94,6 +96,13 @@ public class fragmentBranchFaculty extends Fragment {
                     String iconUrl = document.getString("icon");
 
                     if (name != null && designation != null && phoneNumber != null) {
+                        if (iconUrl != null && !iconUrl.isEmpty()) {
+                            // 🔄 Preload icon image to Glide cache
+                            Glide.with(requireContext())
+                                    .load(iconUrl)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .preload();
+                        }
                         facultyList.add(new ListItem(name, iconUrl, designation, phoneNumber, email));
                     }
                 }
