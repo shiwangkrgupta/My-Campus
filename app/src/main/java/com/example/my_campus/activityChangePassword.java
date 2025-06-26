@@ -20,6 +20,8 @@ import com.chaquo.python.Python;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import org.mindrot.jbcrypt.BCrypt;
+
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -126,8 +128,9 @@ public class activityChangePassword extends AppCompatActivity {
 
             DocumentReference docref = db.collection("users").document(email);
             docref.get().addOnSuccessListener(documentSnapshot -> {
-                if (documentSnapshot.exists()){
-                    docref.update("password", newPassword).addOnSuccessListener( unused -> {
+                if (documentSnapshot.exists()) {
+                    String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+                    docref.update("password", hashedPassword).addOnSuccessListener(unused -> {
                         ut.dismissBufferingDialog();
                         Toast.makeText(this, "Password Changed", Toast.LENGTH_SHORT).show();
                     }).addOnFailureListener(e -> {
@@ -135,6 +138,16 @@ public class activityChangePassword extends AppCompatActivity {
                         Toast.makeText(this, "Unable to change password " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     });
                 }
+
+//                if (documentSnapshot.exists()){
+//                    docref.update("password", newPassword).addOnSuccessListener( unused -> {
+//                        ut.dismissBufferingDialog();
+//                        Toast.makeText(this, "Password Changed", Toast.LENGTH_SHORT).show();
+//                    }).addOnFailureListener(e -> {
+//                        ut.dismissBufferingDialog();
+//                        Toast.makeText(this, "Unable to change password " + e.getMessage(), Toast.LENGTH_SHORT).show();
+//                    });
+//                }
             }).addOnFailureListener(e -> {
                 ut.dismissBufferingDialog();
                 Toast.makeText(this, "Error " + e.getMessage() , Toast.LENGTH_SHORT).show();

@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import java.util.List;
+import com.bumptech.glide.load.engine.DiskCacheStrategy; // Top pe ye import hona chahiye
 
 public class ImageSliderAdapter extends RecyclerView.Adapter<ImageSliderAdapter.ViewHolder> {
 
@@ -31,8 +32,9 @@ public class ImageSliderAdapter extends RecyclerView.Adapter<ImageSliderAdapter.
         // Load image from URL using Glide
         Glide.with(holder.imageView.getContext())
                 .load(imageUrl)
-//                .placeholder(R.drawable.placeholder)  // Placeholder image while loading
+                .placeholder(R.drawable.placeholder) // Placeholder image while loading
 //                .error(R.drawable.error_image)        // Error image if URL fails
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // 👈 Caching for original + resized
                 .into(holder.imageView);
     }
 
