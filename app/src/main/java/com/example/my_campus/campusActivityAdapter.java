@@ -92,8 +92,8 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
                 holder.imageLayout.setEnabled(true);
             }
         } else {
-            holder.senderName.setVisibility(View.VISIBLE);  // Always show sender name for the first message
-            holder.imageLayout.setVisibility(View.VISIBLE);  // Always show profile image for the first message
+            holder.senderName.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE );
+            holder.imageLayout.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE );
         }
 
 
