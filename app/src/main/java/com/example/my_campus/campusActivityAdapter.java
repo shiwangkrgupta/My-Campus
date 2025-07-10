@@ -33,7 +33,6 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
     private String adapterMode;
     private String classActivityCollection;
 
-    // Constructor for adapter
     public campusActivityAdapter(Context context, List<campusActivityItem> messageList, String adapterMode, editMessageCallback callback) {
         setHasStableIds(true);
         this.context = context;
@@ -42,6 +41,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
         this.callback = callback;
         this.adapterMode = adapterMode;
     }
+
     public campusActivityAdapter(Context context, List<campusActivityItem> messageList, String adapterMode, String classActivityCollection, editMessageCallback callback) {
         setHasStableIds(true);
         this.context = context;
@@ -55,22 +55,16 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
     @NonNull
     @Override
     public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // Inflate the item layout
         View view = LayoutInflater.from(context).inflate(R.layout.campus_activity_list_item, parent, false);
         return new MessageViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
-        // Bind data to the view
         campusActivityItem currentItem = messageList.get(position);
         holder.msgBody.setText(currentItem.getMessageBody());
         holder.sentTime.setText(currentItem.getSentTime());
 
-
-
-        // Set layout appearance based on whether the current user is the sender
-        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) holder.messageLayoutParent.getLayoutParams();
         if (isUserSender(currentItem.getSenderEmail())) {
             holder.messageLayout.setBackgroundResource(R.drawable.registration_details_background);
             holder.messageLayoutParent.setGravity(Gravity.END);
@@ -79,23 +73,21 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
             holder.messageLayoutParent.setGravity(Gravity.START);
         }
 
-        // Logic to hide sender name and profile image for consecutive messages from the same user
         if (position > 0) {
             campusActivityItem previousItem = messageList.get(position - 1);
-            if (previousItem.getSenderEmail().equals(currentItem.getSenderEmail()) || (isUserSender(currentItem.getSenderEmail()))) {
-                holder.senderName.setVisibility(View.GONE);  // Hide sender's name
-                holder.imageLayout.setVisibility(View.INVISIBLE);  // Hide profile image
+            if (previousItem.getSenderEmail().equals(currentItem.getSenderEmail()) || isUserSender(currentItem.getSenderEmail())) {
+                holder.senderName.setVisibility(View.GONE);
+                holder.imageLayout.setVisibility(View.INVISIBLE);
                 holder.imageLayout.setEnabled(false);
             } else {
-                holder.senderName.setVisibility(View.VISIBLE);  // Show sender's name
-                holder.imageLayout.setVisibility(View.VISIBLE);  // Show profile image
+                holder.senderName.setVisibility(View.VISIBLE);
+                holder.imageLayout.setVisibility(View.VISIBLE);
                 holder.imageLayout.setEnabled(true);
             }
         } else {
-            holder.senderName.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE );
-            holder.imageLayout.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE );
+            holder.senderName.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE);
+            holder.imageLayout.setVisibility(isUserSender(currentItem.getSenderEmail()) ? View.GONE : View.VISIBLE);
         }
-
 
         holder.imageLayout.setOnClickListener(click -> {
             ut.clickAnimation(click);
@@ -114,37 +106,44 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
                         return;
                     }
                     if (snapshot != null && snapshot.exists()) {
-                        if (isUserSender(currentItem.getSenderEmail())) {
-                            holder.senderName.setText("You");
-                        } else {
-                            holder.senderName.setText(snapshot.getString("name"));
-                        }
-                        String imageUrl = snapshot.getString("profileImage");
+                        holder.senderName.setText(isUserSender(currentItem.getSenderEmail()) ? "You" : snapshot.getString("name"));
                         Glide.with(context)
-                                .load(imageUrl)
+                                .load(snapshot.getString("profileImage"))
                                 .placeholder(R.drawable.ic_default_user)
                                 .error(R.drawable.ic_default_user)
                                 .into(holder.senderProfileImage);
                     }
                 });
-    }
 
+        // Bind reply message preview if available
+        if (currentItem.getReplyMessage() != null && !currentItem.getReplyMessage().isEmpty()) {
+            holder.replyLayout.setVisibility(View.VISIBLE);
+            holder.replyMessage.setText(currentItem.getReplyMessage());
+            if (currentItem.getReplySender() != null) {
+                holder.replySender.setText(currentItem.getReplySender().equals(loginState.getUserEmail(context)) ? "You" : currentItem.getReplySender());
+            } else {
+                holder.replySender.setText("Unknown");
+            }
+        } else {
+            holder.replyLayout.setVisibility(View.GONE);
+        }
+    }
 
     @Override
     public int getItemCount() {
         return messageList.size();
     }
 
+    @Override
     public long getItemId(int position) {
         return messageList.get(position).getDocID().hashCode();
     }
 
-    // ViewHolder class
     public static class MessageViewHolder extends RecyclerView.ViewHolder {
-        TextView senderName, msgBody, sentTime;
+        TextView senderName, msgBody, sentTime, replySender, replyMessage;
         ImageView senderProfileImage;
-        ConstraintLayout  messageLayout;
-        LinearLayout messageLayoutParent;
+        ConstraintLayout messageLayout;
+        LinearLayout messageLayoutParent, replyLayout;
         CardView imageLayout;
 
         public MessageViewHolder(@NonNull View itemView) {
@@ -156,18 +155,21 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
             messageLayoutParent = itemView.findViewById(R.id.messageLayoutParent);
             messageLayout = itemView.findViewById(R.id.messageLayout);
             imageLayout = itemView.findViewById(R.id.profile);
+            replyLayout = itemView.findViewById(R.id.replyLayout);
+            replySender = itemView.findViewById(R.id.replySender);
+            replyMessage = itemView.findViewById(R.id.replyMessage);
         }
     }
 
-    private boolean isUserSender(String senderEmail){
+    private boolean isUserSender(String senderEmail) {
         return senderEmail.equals(loginState.getUserEmail(context));
     }
 
     private void showContextMenu(View view, String sender, String docId) {
         PopupMenu popupMenu = new PopupMenu(context, view);
-        popupMenu.inflate(R.menu.campus_context_menu);// Define menu in res/menu/context_menu.xml
+        popupMenu.inflate(R.menu.campus_context_menu);
 
-        if (sender.equals(loginState.getUserEmail(context)) && loginState.getUserRole(context).equals("admin")){
+        if (sender.equals(loginState.getUserEmail(context)) && loginState.getUserRole(context).equals("admin")) {
             MenuItem deleteItem = popupMenu.getMenu().findItem(R.id.menu_delete);
             MenuItem editItem = popupMenu.getMenu().findItem(R.id.menu_edit);
             if (deleteItem != null) {
@@ -182,11 +184,10 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
 
         popupMenu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.menu_delete) {
-                // Handle Delete Item
                 deleteMessage(docId);
                 return true;
             }
-            if (item.getItemId() == R.id.menu_edit){
+            if (item.getItemId() == R.id.menu_edit) {
                 callback.passMessageDocId(docId);
                 return true;
             }
@@ -196,31 +197,24 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
     }
 
     private void deleteMessage(String docId) {
-
-        if (adapterMode.equals(activityCampusActivity.campusActivity)){
+        if (adapterMode.equals(activityCampusActivity.campusActivity)) {
             db.collection("campus activity").document(docId)
                     .delete()
-                    .addOnSuccessListener( unused -> {
-                        Toast.makeText(context, "deleted", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener( e -> {
-                        Toast.makeText(context, "Error While Deleting", Toast.LENGTH_SHORT).show();
-                    });
-        }else {
+                    .addOnSuccessListener(unused ->
+                            Toast.makeText(context, "deleted", Toast.LENGTH_SHORT).show())
+                    .addOnFailureListener(e ->
+                            Toast.makeText(context, "Error While Deleting", Toast.LENGTH_SHORT).show());
+        } else {
             db.collection(classActivityCollection).document(docId)
                     .delete()
-                    .addOnSuccessListener( unused -> {
-                        Toast.makeText(context, "deleted", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener( e -> {
-                        Toast.makeText(context, "Error While Deleting", Toast.LENGTH_SHORT).show();
-                    });
+                    .addOnSuccessListener(unused ->
+                            Toast.makeText(context, "deleted", Toast.LENGTH_SHORT).show())
+                    .addOnFailureListener(e ->
+                            Toast.makeText(context, "Error While Deleting", Toast.LENGTH_SHORT).show());
         }
-
-
     }
 
-    public interface editMessageCallback{
+    public interface editMessageCallback {
         void passMessageDocId(String docID);
     }
 }

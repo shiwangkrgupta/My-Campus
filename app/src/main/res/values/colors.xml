@@ -4,5 +4,6 @@
     <color name="white">#FFFFFFFF</color>
     <color name="appAscent">#F0ECEC</color>
     <color name="lightGrey">#E0E3E1</color>
+    <color name="darkGrey">#666666</color>
 </resources>
 

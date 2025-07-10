@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -53,7 +54,8 @@ public class activityCampusActivity extends AppCompatActivity {
     private EditText messageInput;
     private ImageView btnCancelEdit;
     private String editMessageDocID;
-    private String intentKey, classActivityCollection;
+    private String intentKey, classActivityCollection, replySender, reply;
+    private boolean isReplying;
     private  CollectionReference messageCollection;
     public static final String classActivity = "class_activity";
     public static final String campusActivity = "campus_activity";
@@ -171,6 +173,56 @@ public class activityCampusActivity extends AppCompatActivity {
             messageView.scrollToPosition(adapter.getItemCount() - 1);
         }
 
+        // Swipe to Reply setup
+        ItemTouchHelper.SimpleCallback simpleCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder){
+                return 0.2f; //Just 20% swipe needed
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                campusActivityItem item = campusActivityItemsList.get(position);
+
+                // Set reply values
+                reply = item.getMessage();
+                String replySenderEmail = item.getSentBy();
+                isReplying = true;
+
+                // Input field focus and keyboard show
+                messageInput.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT);
+                }
+
+                // Swipe reset (so item doesn't disappear)
+                adapter.notifyItemChanged(position);
+
+                // Fetch sender name from Firestore
+                db.collection("users").document(replySenderEmail)
+                        .get()
+                        .addOnSuccessListener(documentSnapshot -> {
+                            replySender = documentSnapshot.exists() && documentSnapshot.getString("name") != null
+                                    ? documentSnapshot.getString("name")
+                                    : replySenderEmail;
+
+                        })
+                        .addOnFailureListener(e -> {
+                            replySender = replySenderEmail;
+                        });
+            }
+
+        };
+        new ItemTouchHelper(simpleCallback).attachToRecyclerView(messageView);
+
+
         //Fetching message documents
         if (intentKey.equals("campus_activity")){
             messageCollection =  db.collection("campus activity");
@@ -193,7 +245,10 @@ public class activityCampusActivity extends AppCompatActivity {
                             String sentBy = document.getString("sentBy");
                             String sentTime = document.getString("sentTime");
                             String docId = document.getId();
-                            campusActivityItemsList.add(new campusActivityItem(sentBy, message, sentTime, docId));
+                            String replyMessage = document.getString("replyMessage");
+                            String replySender = document.getString("replySender");
+
+                            campusActivityItemsList.add(new campusActivityItem(sentBy, message, sentTime, docId, replyMessage, replySender));
                         }
                         adapter.notifyDataSetChanged();
                         // Scroll only if the new list size is greater (indicating an addition)
@@ -223,6 +278,12 @@ public class activityCampusActivity extends AppCompatActivity {
         messageData.put("sentBy", loginState.getUserEmail(this));
         messageData.put("sentTime", ut.getDateTime());
         messageData.put("timestamp", System.currentTimeMillis());
+
+        if (isReplying && reply != null && !reply.isEmpty()) {
+            messageData.put("replyMessage", reply); // This should be the message text being replied to
+            messageData.put("replySender", replySender); // The original sender of the message
+            isReplying = false;
+        }
 
         if (intentKey.equals("campus_activity")){
             db.collection("campus activity").add(messageData)
