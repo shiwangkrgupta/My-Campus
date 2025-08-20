@@ -5,6 +5,8 @@ import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -122,6 +124,9 @@ public class MainActivity extends AppCompatActivity {
         //Creating directories to store data
         createAppDirectories();
 
+        //Creating notification channel
+        createNotificationChannel();
+
         //Fetching profile image url
         DocumentReference docref = db.collection("users").document(loginState.getUserEmail(this));
         docref.addSnapshotListener((documentSnapshot, e) -> {
@@ -145,6 +150,9 @@ public class MainActivity extends AppCompatActivity {
                 //Toast.makeText(this, "Fetching token function", Toast.LENGTH_SHORT).show();
                 getDeviceToken();
             }
+        }
+        else {
+            getDeviceToken();
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PERMISSION_GRANTED) {
@@ -492,6 +500,23 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+    public void createNotificationChannel(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "activity_channel", // same as used in builder
+                    "Activity Notifications",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Notifications for chat and campus activity.");
+
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
+        }
+    }
+
 
 
 }

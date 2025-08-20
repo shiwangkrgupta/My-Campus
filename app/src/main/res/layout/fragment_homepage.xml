@@ -92,6 +92,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="15dp"
+            android:paddingEnd="10dp"
             android:layout_marginEnd="15dp"
             android:background="@drawable/help_tile_background"
             android:orientation="vertical"
@@ -137,6 +138,8 @@
                 android:layout_marginTop="7dp"
                 android:text="No question yet"
                 android:textSize="17dp"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:textStyle="bold" />
 
             <TextView

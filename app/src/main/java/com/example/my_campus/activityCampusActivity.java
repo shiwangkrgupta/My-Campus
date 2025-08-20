@@ -55,6 +55,7 @@ public class activityCampusActivity extends AppCompatActivity {
     private ImageView btnCancelEdit;
     private String editMessageDocID;
     private String intentKey, classActivityCollection, replySender, reply;
+    private int messagePosition;
     private boolean isReplying;
     private  CollectionReference messageCollection;
     public static final String classActivity = "class_activity";
@@ -82,12 +83,16 @@ public class activityCampusActivity extends AppCompatActivity {
 
         Intent intent = getIntent();
         intentKey = intent.getStringExtra("key");
+        Log.d("INTENT_KEY", "onActivityPage: "+ intentKey);
 
+        if (intentKey.equals("campus_activity_notification")){
+            messagePosition = intent.getIntExtra("messagePosition", 0);
+            Log.d("INTENT_KEY", "messagePosition: "+ messagePosition);
+        }
 
-
-
-        if (intentKey.equals("campus_activity")){
+        if (intentKey.equals("campus_activity")|| intentKey.equals("campus_activity_notification")){
             activityTitle.setText("Campus Activity");
+            messageCollection = db.collection("campus activity"); // ✅ Set directly here
             //Setting Message input section visibility only for admins
             db.collection("users").document(loginState.getUserEmail(this))
                     .addSnapshotListener( (snapshot, e) -> {
@@ -108,6 +113,7 @@ public class activityCampusActivity extends AppCompatActivity {
         }
         else {
             activityTitle.setText("Class Activity");
+
             Map <String, String> branchMap = new HashMap<>();
             branchMap.put("Computer Science & Engineering", "cse");
             branchMap.put("Civil Engineering", "civil");
@@ -116,12 +122,14 @@ public class activityCampusActivity extends AppCompatActivity {
             branchMap.put("Electronics Engineering", "electronic");
             branchMap.put("Mechanical Engineering", "mech");
 
+
             Map <String, String> yearMap = new HashMap<>();
             yearMap.put("First Year", "first");
             yearMap.put("Second Year", "second");
             yearMap.put("Third Year", "third");
 
-            classActivityCollection = "class activity " + branchMap.get(loginState.getUserBranch(this))+ " " + yearMap.get(loginState.getUserYear(this));
+            classActivityCollection = "class activity " + branchMap.get(loginState.getUserBranch(this)) + " " + yearMap.get(loginState.getUserYear(this));
+            messageCollection = db.collection(classActivityCollection); // ✅ Set directly here
         }
 
         btnSend.setOnClickListener( click -> {
@@ -132,7 +140,6 @@ public class activityCampusActivity extends AppCompatActivity {
             else {
                 sendMessage();
             }
-
         });
 
         btnCancelEdit.setOnClickListener( click -> {
@@ -223,14 +230,6 @@ public class activityCampusActivity extends AppCompatActivity {
         new ItemTouchHelper(simpleCallback).attachToRecyclerView(messageView);
 
 
-        //Fetching message documents
-        if (intentKey.equals("campus_activity")){
-            messageCollection =  db.collection("campus activity");
-        }
-        else {
-            messageCollection = db.collection(classActivityCollection);
-        }
-
                 messageCollection.orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener( (queryDocumentSnapshots, e) -> {
                     if (e != null){
@@ -254,7 +253,10 @@ public class activityCampusActivity extends AppCompatActivity {
                         // Scroll only if the new list size is greater (indicating an addition)
                         if (campusActivityItemsList.size() > previousSize) {
                             new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                if (adapter.getItemCount() > 0) {
+                                if (intentKey.equals("campus_activity_notification")){
+                                    messageView.smoothScrollToPosition(messagePosition-1);
+                                }
+                                else if (adapter.getItemCount() > 0) {
                                     messageView.smoothScrollToPosition(adapter.getItemCount() - 1);
                                 }
                             }, 700); // Delay of 700ms
@@ -278,6 +280,7 @@ public class activityCampusActivity extends AppCompatActivity {
         messageData.put("sentBy", loginState.getUserEmail(this));
         messageData.put("sentTime", ut.getDateTime());
         messageData.put("timestamp", System.currentTimeMillis());
+        messageData.put("position", adapter.getItemCount());
 
         if (isReplying && reply != null && !reply.isEmpty()) {
             messageData.put("replyMessage", reply); // This should be the message text being replied to
@@ -346,6 +349,7 @@ public class activityCampusActivity extends AppCompatActivity {
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("message", message);
         messageData.put("sentTime", "edited "+ut.getDateTime());
+        messageData.put("position", adapter.getItemCount());
 
                 editMessageDoc.update(messageData)
                 .addOnSuccessListener( unused -> {
