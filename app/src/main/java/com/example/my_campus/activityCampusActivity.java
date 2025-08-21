@@ -1,6 +1,7 @@
 package com.example.my_campus;
 
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +29,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.json.JSONObject;
 
@@ -47,19 +49,36 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class activityCampusActivity extends AppCompatActivity {
-    private FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private utility ut = new utility();
+
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private final utility ut = new utility();
+
     private List<campusActivityItem> campusActivityItemsList = new ArrayList<>();
+    private campusActivityAdapter adapter;
+
     private ConstraintLayout btnSend, editIndicator;
+
+    // 🔽 Reply preview (bottom bar) views from activity_campus.xml
+    private ConstraintLayout replyIndicator;        // id: replyIndicatorCampus
+    private TextView tvReplyTo;                      // id: tvReplyTo
+    private TextView tvReplyMessage;                 // id: tvReplyQuestion
+    private ImageView btnCancelReply;                // id: btnCancelReply
+
     private EditText messageInput;
     private ImageView btnCancelEdit;
+
     private String editMessageDocID;
-    private String intentKey, classActivityCollection, replySender, reply;
-    private boolean isReplying;
-    private  CollectionReference messageCollection;
+    private String intentKey, classActivityCollection;
+
+    // Current reply data
+    private boolean isReplying = false;
+    private String replyText = null;         // message you're replying to
+    private String replySenderName = null;   // name/email of original sender
+
+    private CollectionReference messageCollection;
     public static final String classActivity = "class_activity";
     public static final String campusActivity = "campus_activity";
-    private campusActivityAdapter adapter;
+
     private DocumentReference editMessageDoc;
 
     @Override
@@ -78,37 +97,39 @@ public class activityCampusActivity extends AppCompatActivity {
         btnCancelEdit = findViewById(R.id.btnCancelEdit);
         TextView activityTitle = findViewById(R.id.activityTitle);
 
-        btnBack.setOnClickListener( click -> finish());
+        // ✅ Reply preview init (use IDs from activity_campus.xml)
+        replyIndicator   = findViewById(R.id.replyIndicatorCampus);
+        tvReplyTo        = findViewById(R.id.tvReplyTo);
+        tvReplyMessage   = findViewById(R.id.tvReplyQuestion);
+        btnCancelReply   = findViewById(R.id.btnCancelReply);
+
+        btnBack.setOnClickListener(click -> finish());
 
         Intent intent = getIntent();
         intentKey = intent.getStringExtra("key");
 
-
-
-
-        if (intentKey.equals("campus_activity")){
+        if ("campus_activity".equals(intentKey)) {
             activityTitle.setText("Campus Activity");
-            //Setting Message input section visibility only for admins
+
             db.collection("users").document(loginState.getUserEmail(this))
-                    .addSnapshotListener( (snapshot, e) -> {
-                        if (e != null){
+                    .addSnapshotListener((snapshot, e) -> {
+                        if (e != null) {
                             Log.d("campusInputSection", Objects.requireNonNull(e.getMessage()));
                             return;
                         }
-                        if (snapshot != null && snapshot.exists()){
-                            if (snapshot.getString("role").equals("admin")){
+                        if (snapshot != null && snapshot.exists()) {
+                            if ("admin".equals(snapshot.getString("role"))) {
                                 messageInputParent.setVisibility(View.VISIBLE);
-                            }
-                            else {
+                            } else {
                                 messageInputParent.setVisibility(View.GONE);
                             }
                         }
                     });
 
-        }
-        else {
+        } else {
             activityTitle.setText("Class Activity");
-            Map <String, String> branchMap = new HashMap<>();
+
+            Map<String, String> branchMap = new HashMap<>();
             branchMap.put("Computer Science & Engineering", "cse");
             branchMap.put("Civil Engineering", "civil");
             branchMap.put("Automobile Engineering", "auto");
@@ -116,55 +137,57 @@ public class activityCampusActivity extends AppCompatActivity {
             branchMap.put("Electronics Engineering", "electronic");
             branchMap.put("Mechanical Engineering", "mech");
 
-            Map <String, String> yearMap = new HashMap<>();
+            Map<String, String> yearMap = new HashMap<>();
             yearMap.put("First Year", "first");
             yearMap.put("Second Year", "second");
             yearMap.put("Third Year", "third");
 
-            classActivityCollection = "class activity " + branchMap.get(loginState.getUserBranch(this))+ " " + yearMap.get(loginState.getUserYear(this));
+            classActivityCollection = "class activity " +
+                    branchMap.get(loginState.getUserBranch(this)) + " " +
+                    yearMap.get(loginState.getUserYear(this));
         }
 
-        btnSend.setOnClickListener( click -> {
+        btnSend.setOnClickListener(click -> {
             ut.clickAnimation(click);
-            if (editIndicator.getVisibility() == View.VISIBLE){
+            if (editIndicator.getVisibility() == View.VISIBLE) {
                 sendEditedMessage(editMessageDocID);
-            }
-            else {
+            } else {
                 sendMessage();
             }
-
         });
 
-        btnCancelEdit.setOnClickListener( click -> {
+        btnCancelEdit.setOnClickListener(click -> {
             ut.clickAnimation(click);
             editIndicator.setVisibility(View.GONE);
             messageInput.setText("");
         });
 
+        // Cancel reply preview
+        btnCancelReply.setOnClickListener(v -> {
+            hideReplyPreview();
+            isReplying = false;
+            replyText = null;
+            replySenderName = null;
+        });
 
-        //Set status bar and navigation bar color
+        // System bars
         Window window = getWindow();
-        // Set status bar color
         window.setStatusBarColor(ContextCompat.getColor(this, R.color.lightGrey));
-        // Set navigation bar color
         window.setNavigationBarColor(ContextCompat.getColor(this, R.color.lightGrey));
 
-
-
-        //Setting Recycler view adapter
-        if (intentKey.equals("campus_activity")){
-            adapter = new campusActivityAdapter(this, campusActivityItemsList, campusActivity, editMessageDocID ->{
+        // RecyclerView + adapter
+        if ("campus_activity".equals(intentKey)) {
+            adapter = new campusActivityAdapter(this, campusActivityItemsList, campusActivity, editMessageDocID -> {
+                this.editMessageDocID = editMessageDocID;
+                getMessageToEdit(editMessageDocID);
+            });
+        } else {
+            adapter = new campusActivityAdapter(this, campusActivityItemsList, classActivity, classActivityCollection, editMessageDocID -> {
                 this.editMessageDocID = editMessageDocID;
                 getMessageToEdit(editMessageDocID);
             });
         }
-        else {
-            adapter = new campusActivityAdapter(this, campusActivityItemsList, classActivity, classActivityCollection, editMessageDocID ->{
-                this.editMessageDocID = editMessageDocID;
-                getMessageToEdit(editMessageDocID);
-            });
 
-        }
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
         messageView.setLayoutManager(layoutManager);
@@ -173,105 +196,115 @@ public class activityCampusActivity extends AppCompatActivity {
             messageView.scrollToPosition(adapter.getItemCount() - 1);
         }
 
-        // Swipe to Reply setup
+        // Swipe-to-reply
         ItemTouchHelper.SimpleCallback simpleCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
-            }
+            @Override public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder vh) { return 0.4f; }
+            @Override public float getSwipeEscapeVelocity(float d) { return Float.MAX_VALUE; }
+            @Override public float getSwipeVelocityThreshold(float d) { return Float.MAX_VALUE; }
 
             @Override
-            public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder){
-                return 0.2f; //Just 20% swipe needed
+            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder vh,
+                                    float dX, float dY, int actionState, boolean isCurrentlyActive) {
+                float max = vh.itemView.getWidth() * 0.2f;
+                if (dX > max) dX = max;
+                super.onChildDraw(c, rv, vh, dX, dY, actionState, isCurrentlyActive);
             }
+
+            @Override public boolean onMove(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder v1, @NonNull RecyclerView.ViewHolder v2) { return false; }
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
                 campusActivityItem item = campusActivityItemsList.get(position);
 
-                // Set reply values
-                reply = item.getMessage();
+                // collect reply info
+                replyText = item.getMessage();
                 String replySenderEmail = item.getSentBy();
                 isReplying = true;
 
-                // Input field focus and keyboard show
-                messageInput.requestFocus();
-                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT);
-                }
+                // show preview
+                tvReplyMessage.setText(replyText);
+                replyIndicator.setVisibility(View.VISIBLE);
 
-                // Swipe reset (so item doesn't disappear)
-                adapter.notifyItemChanged(position);
-
-                // Fetch sender name from Firestore
                 db.collection("users").document(replySenderEmail)
                         .get()
                         .addOnSuccessListener(documentSnapshot -> {
-                            replySender = documentSnapshot.exists() && documentSnapshot.getString("name") != null
-                                    ? documentSnapshot.getString("name")
-                                    : replySenderEmail;
-
+                            if (documentSnapshot.exists() && documentSnapshot.contains("name")) {
+                                replySenderName = documentSnapshot.getString("name");
+                            } else {
+                                replySenderName = replySenderEmail;
+                            }
+                            tvReplyTo.setText(replySenderName);
                         })
                         .addOnFailureListener(e -> {
-                            replySender = replySenderEmail;
+                            replySenderName = replySenderEmail;
+                            tvReplyTo.setText(replySenderName);
                         });
-            }
 
+                // focus input + keyboard
+                messageInput.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT);
+
+                // reset swipe visual
+                adapter.notifyItemChanged(position);
+            }
         };
         new ItemTouchHelper(simpleCallback).attachToRecyclerView(messageView);
 
-
-        //Fetching message documents
-        if (intentKey.equals("campus_activity")){
-            messageCollection =  db.collection("campus activity");
-        }
-        else {
+        // Load messages
+        if ("campus_activity".equals(intentKey)) {
+            messageCollection = db.collection("campus activity");
+        } else {
             messageCollection = db.collection(classActivityCollection);
         }
 
-                messageCollection.orderBy("timestamp", Query.Direction.ASCENDING)
-                .addSnapshotListener( (queryDocumentSnapshots, e) -> {
-                    if (e != null){
+        messageCollection.orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null) {
                         Log.d("activityMessage", e.getMessage());
                         return;
                     }
-                    if (queryDocumentSnapshots != null){
-                        int previousSize = campusActivityItemsList.size();
+                    if (snapshots != null) {
+                        int prev = campusActivityItemsList.size();
                         campusActivityItemsList.clear();
-                        for (DocumentSnapshot document : queryDocumentSnapshots.getDocuments()) {
+                        for (DocumentSnapshot document : snapshots.getDocuments()) {
                             String message = document.getString("message");
                             String sentBy = document.getString("sentBy");
                             String sentTime = document.getString("sentTime");
                             String docId = document.getId();
-                            String replyMessage = document.getString("replyMessage");
-                            String replySender = document.getString("replySender");
+                            String rMsg = document.getString("replyMessage");
+                            String rSender = document.getString("replySender");
 
-                            campusActivityItemsList.add(new campusActivityItem(sentBy, message, sentTime, docId, replyMessage, replySender));
+                            campusActivityItemsList.add(new campusActivityItem(sentBy, message, sentTime, docId, rMsg, rSender));
                         }
                         adapter.notifyDataSetChanged();
-                        // Scroll only if the new list size is greater (indicating an addition)
-                        if (campusActivityItemsList.size() > previousSize) {
+                        if (campusActivityItemsList.size() > prev) {
                             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                                 if (adapter.getItemCount() > 0) {
                                     messageView.smoothScrollToPosition(adapter.getItemCount() - 1);
                                 }
-                            }, 700); // Delay of 700ms
+                            }, 700);
                         }
                     }
                 });
 
+        // Save FCM token
+        saveFCMTokenToFirestore();
     }
 
-    private void sendMessage(){
-        if (!ut.isNetworkAvailable(this)){
-            return;
-        }
-        String message = messageInput.getText().toString();
-        if (message.isEmpty()){
-            return;
-        }
+    private void hideReplyPreview() {
+        replyIndicator.setVisibility(View.GONE);
+        tvReplyTo.setText("");
+        tvReplyMessage.setText("");
+    }
+
+    private void sendMessage() {
+        if (!ut.isNetworkAvailable(this)) return;
+
+        String message = messageInput.getText().toString().trim();
+        if (message.isEmpty()) return;
+
         btnSend.setEnabled(false);
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("message", message);
@@ -279,15 +312,19 @@ public class activityCampusActivity extends AppCompatActivity {
         messageData.put("sentTime", ut.getDateTime());
         messageData.put("timestamp", System.currentTimeMillis());
 
-        if (isReplying && reply != null && !reply.isEmpty()) {
-            messageData.put("replyMessage", reply); // This should be the message text being replied to
-            messageData.put("replySender", replySender); // The original sender of the message
+        // attach reply metadata if any
+        if (isReplying && replyText != null && !replyText.isEmpty()) {
+            messageData.put("replyMessage", replyText);
+            messageData.put("replySender", replySenderName);
             isReplying = false;
+            hideReplyPreview();
+            replyText = null;
+            replySenderName = null;
         }
 
-        if (intentKey.equals("campus_activity")){
+        if ("campus_activity".equals(intentKey)) {
             db.collection("campus activity").add(messageData)
-                    .addOnSuccessListener( unused -> {
+                    .addOnSuccessListener(unused -> {
                         messageInput.setText("");
                         ut.playSentSound(this);
                         btnSend.setEnabled(true);
@@ -298,10 +335,9 @@ public class activityCampusActivity extends AppCompatActivity {
                         btnSend.setEnabled(true);
                         Toast.makeText(this, "Error while sending message", Toast.LENGTH_SHORT).show();
                     });
-        }
-        else {
+        } else {
             db.collection(classActivityCollection).add(messageData)
-                    .addOnSuccessListener( unused -> {
+                    .addOnSuccessListener(unused -> {
                         messageInput.setText("");
                         ut.playSentSound(this);
                         btnSend.setEnabled(true);
@@ -312,50 +348,46 @@ public class activityCampusActivity extends AppCompatActivity {
                         Toast.makeText(this, "Error while sending message", Toast.LENGTH_SHORT).show();
                     });
         }
-
     }
 
-    private void getMessageToEdit(String editMessageDocID){
-        if (intentKey.equals("campus_activity")){
+    private void getMessageToEdit(String editMessageDocID) {
+        if ("campus_activity".equals(intentKey)) {
             editMessageDoc = db.collection("campus activity").document(editMessageDocID);
-        }
-        else {
+        } else {
             editMessageDoc = db.collection(classActivityCollection).document(editMessageDocID);
         }
-                editMessageDoc.get()
-                .addOnSuccessListener( snap -> {
-                    if (snap!= null && snap.exists()){
+        editMessageDoc.get()
+                .addOnSuccessListener(snap -> {
+                    if (snap != null && snap.exists()) {
                         messageInput.setText(snap.getString("message"));
                         messageInput.requestFocus();
                         InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                        imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT);
+                        if (imm != null) imm.showSoftInput(messageInput, InputMethodManager.SHOW_IMPLICIT);
                         editIndicator.setVisibility(View.VISIBLE);
                     }
                 });
     }
 
-    private void sendEditedMessage(String docId){
-        if (!ut.isNetworkAvailable(this)){
-            return;
-        }
-        String message = messageInput.getText().toString();
-        if (message.isEmpty()){
-            return;
-        }
+    private void sendEditedMessage(String docId) {
+        if (!ut.isNetworkAvailable(this)) return;
+
+        String message = messageInput.getText().toString().trim();
+        if (message.isEmpty()) return;
+
         btnSend.setEnabled(false);
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("message", message);
-        messageData.put("sentTime", "edited "+ut.getDateTime());
+        messageData.put("sentTime", "edited " + ut.getDateTime());
 
-                editMessageDoc.update(messageData)
-                .addOnSuccessListener( unused -> {
+        editMessageDoc.update(messageData)
+                .addOnSuccessListener(unused -> {
                     messageInput.setText("");
                     ut.playSentSound(this);
                     btnSend.setEnabled(true);
                     editIndicator.setVisibility(View.GONE);
                     Toast.makeText(this, "Updated", Toast.LENGTH_SHORT).show();
                 })
-                .addOnFailureListener( e -> {
+                .addOnFailureListener(e -> {
                     btnSend.setEnabled(true);
                     Toast.makeText(this, "Error while updating message", Toast.LENGTH_SHORT).show();
                 });
@@ -370,6 +402,25 @@ public class activityCampusActivity extends AppCompatActivity {
                         if (token != null) {
                             sendFCMNotification(token, messageText);
                         }
+                    }
+                });
+    }
+
+    private void saveFCMTokenToFirestore() {
+        FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        String token = task.getResult();
+                        String userEmail = loginState.getUserEmail(this);
+                        if (userEmail != null && !userEmail.isEmpty()) {
+                            FirebaseFirestore.getInstance().collection("users")
+                                    .document(userEmail)
+                                    .update("token", token)
+                                    .addOnSuccessListener(aVoid -> Log.d("FCM_TOKEN", "Token saved"))
+                                    .addOnFailureListener(e -> Log.e("FCM_TOKEN", "Error: " + e.getMessage()));
+                        }
+                    } else {
+                        Log.e("FCM_TOKEN", "Token fetch failed");
                     }
                 });
     }
@@ -399,20 +450,16 @@ public class activityCampusActivity extends AppCompatActivity {
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
                     Log.e("FCM_API", "Notification failed", e);
                 }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                @Override public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                     Log.d("FCM_API", "FCM API: " + response.body().string());
                 }
             });
 
         } catch (Exception e) {
-            Log.d("FCM_API_ERROR", "sendFCMNotification: "+ e.getMessage());
+            Log.d("FCM_API_ERROR", "sendFCMNotification: " + e.getMessage());
         }
     }
-
 }

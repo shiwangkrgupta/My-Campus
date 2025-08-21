@@ -119,8 +119,10 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
         if (currentItem.getReplyMessage() != null && !currentItem.getReplyMessage().isEmpty()) {
             holder.replyLayout.setVisibility(View.VISIBLE);
             holder.replyMessage.setText(currentItem.getReplyMessage());
-            if (currentItem.getReplySender() != null) {
-                holder.replySender.setText(currentItem.getReplySender().equals(loginState.getUserEmail(context)) ? "You" : currentItem.getReplySender());
+
+            String replySenderText = currentItem.getReplySender();
+            if (replySenderText != null && !replySenderText.isEmpty()) {
+                holder.replySender.setText(replySenderText.equals(loginState.getUserEmail(context)) ? "You" : replySenderText);
             } else {
                 holder.replySender.setText("Unknown");
             }

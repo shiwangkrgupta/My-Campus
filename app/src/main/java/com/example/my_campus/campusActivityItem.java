@@ -8,13 +8,6 @@ public class campusActivityItem {
     private String replyMessage;
     private String replySender;
 
-    // Constructor without reply (for older messages)
-    public campusActivityItem(String senderEmail, String messageBody, String sentTime, String docID) {
-        this.senderEmail = senderEmail;
-        this.messageBody = messageBody;
-        this.sentTime = sentTime;
-        this.docID = docID;
-    }
 
     // Constructor with reply
     public campusActivityItem(String senderEmail, String messageBody, String sentTime, String docID, String replyMessage, String replySender) {

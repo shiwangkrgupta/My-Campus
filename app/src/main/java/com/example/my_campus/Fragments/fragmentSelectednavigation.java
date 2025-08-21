@@ -12,9 +12,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import com.example.my_campus.R;
+import com.example.my_campus.utility;
 
 public class fragmentSelectednavigation extends Fragment {
     private WebView webView;
+    private utility ut = new utility();
+
 
     public fragmentSelectednavigation() {
         // Required empty public constructor
@@ -33,9 +36,18 @@ public class fragmentSelectednavigation extends Fragment {
         TextView title = view.findViewById(R.id.tittle);
         webView = view.findViewById(R.id.webView);
 
+        // 1️⃣  Show the buffering / loading dialog
+        ut.showBufferingDialog(requireContext(), "Loading files");
+
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                ut.dismissBufferingDialog(); // ✅ Dismiss dialog when loading is done
+            }
+        });
 
         Bundle bundle = getArguments();
         if (bundle != null) {
@@ -66,7 +78,6 @@ public class fragmentSelectednavigation extends Fragment {
 
                 webView.loadDataWithBaseURL(null, htmlData, "text/html", "UTF-8", null);
             }
-
         }
     }
 }
