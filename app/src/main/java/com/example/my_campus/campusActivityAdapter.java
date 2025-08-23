@@ -62,6 +62,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
         campusActivityItem currentItem = messageList.get(position);
+
         holder.msgBody.setText(currentItem.getMessageBody());
         holder.sentTime.setText(currentItem.getSentTime());
 
@@ -115,7 +116,6 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
                     }
                 });
 
-        // Bind reply message preview if available
         if (currentItem.getReplyMessage() != null && !currentItem.getReplyMessage().isEmpty()) {
             holder.replyLayout.setVisibility(View.VISIBLE);
             holder.replyMessage.setText(currentItem.getReplyMessage());
@@ -125,6 +125,10 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
                 holder.replySender.setText(replySenderText.equals(loginState.getUserEmail(context)) ? "You" : replySenderText);
             } else {
                 holder.replySender.setText("Unknown");
+            }
+
+            if (holder.replyCancelBtn != null) {
+                holder.replyCancelBtn.setVisibility(View.GONE);
             }
         } else {
             holder.replyLayout.setVisibility(View.GONE);
@@ -143,7 +147,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
 
     public static class MessageViewHolder extends RecyclerView.ViewHolder {
         TextView senderName, msgBody, sentTime, replySender, replyMessage;
-        ImageView senderProfileImage;
+        ImageView senderProfileImage, replyCancelBtn;
         ConstraintLayout messageLayout;
         LinearLayout messageLayoutParent, replyLayout;
         CardView imageLayout;
@@ -160,6 +164,12 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
             replyLayout = itemView.findViewById(R.id.replyLayout);
             replySender = itemView.findViewById(R.id.replySender);
             replyMessage = itemView.findViewById(R.id.replyMessage);
+
+            int id1 = itemView.getResources().getIdentifier("replyCancelBtn", "id", itemView.getContext().getPackageName());
+            int id2 = itemView.getResources().getIdentifier("btnCancelReply", "id", itemView.getContext().getPackageName());
+            replyCancelBtn = null;
+            if (id1 != 0) replyCancelBtn = itemView.findViewById(id1);
+            else if (id2 != 0) replyCancelBtn = itemView.findViewById(id2);
         }
     }
 
