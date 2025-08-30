@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
 
         // Disable screenshot and screen recording
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        // getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
 
         FirebaseMessaging.getInstance().getToken()
                 .addOnSuccessListener(token -> {

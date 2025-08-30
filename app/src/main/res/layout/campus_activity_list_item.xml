@@ -41,21 +41,19 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:background="@drawable/rounded_ractangle_1"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp">
+            android:padding="6dp">
 
             <!-- Sender Name -->
             <TextView
                 android:id="@+id/senderName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
-                android:layout_marginTop="6dp"
                 android:maxLength="30"
                 android:maxLines="1"
                 android:text="Senders Name"
                 android:textColor="#003731"
-                android:textSize="15sp"
+                android:textSize="14sp"
+                android:textStyle="bold"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent" />
 
@@ -66,7 +64,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="6dp"
-                android:background="#e1e1e1"
+                android:background="#e6e6e6"
                 android:visibility="gone"
                 app:layout_constraintTop_toBottomOf="@id/senderName"
                 app:layout_constraintStart_toStartOf="parent"
@@ -77,25 +75,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Sender"
+                    android:maxLines="1"
+                    android:maxLength="30"
                     android:textStyle="bold"
                     android:textSize="12sp"
                     android:textColor="#004d40" />
 
                 <TextView
                     android:id="@+id/replyMessage"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Replied message preview"
                     android:textSize="13sp"
                     android:textColor="#333333"
                     android:maxLines="2"
                     android:ellipsize="end" />
-
-                <ImageView
-                    android:id="@+id/btnCancelReply"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_close" />
             </LinearLayout>
 
             <!-- Actual Message -->
@@ -103,12 +97,11 @@
                 android:id="@+id/msgBody"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="Message Body"
                 android:textColor="#000"
                 android:textSize="16sp"
-                android:gravity="start"
-                app:layout_constraintTop_toBottomOf="@+id/replyLayout"
+                app:layout_constraintTop_toBottomOf="@id/replyLayout"
                 app:layout_constraintStart_toStartOf="parent" />
 
             <!-- Time -->
@@ -116,12 +109,12 @@
                 android:id="@+id/sentTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="5dp"
+                android:layout_marginTop="2dp"
                 android:layout_marginEnd="6dp"
                 android:text="16/12 3:24 pm"
                 android:textSize="10sp"
+                android:textColor="#666"
                 app:layout_constraintTop_toBottomOf="@+id/msgBody"
-                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>

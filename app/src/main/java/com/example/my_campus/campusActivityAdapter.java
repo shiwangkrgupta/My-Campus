@@ -25,12 +25,12 @@ import java.util.List;
 
 public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAdapter.MessageViewHolder> {
 
-    private Context context;
-    private List<campusActivityItem> messageList;
-    private FirebaseFirestore db;
-    private utility ut = new utility();
-    private editMessageCallback callback;
-    private String adapterMode;
+    private final Context context;
+    private final List<campusActivityItem> messageList;
+    private final FirebaseFirestore db;
+    private final utility ut = new utility();
+    private final editMessageCallback callback;
+    private final String adapterMode;
     private String classActivityCollection;
 
     public campusActivityAdapter(Context context, List<campusActivityItem> messageList, String adapterMode, editMessageCallback callback) {
@@ -66,6 +66,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
         holder.msgBody.setText(currentItem.getMessageBody());
         holder.sentTime.setText(currentItem.getSentTime());
 
+        // Sender or Receiver bubble
         if (isUserSender(currentItem.getSenderEmail())) {
             holder.messageLayout.setBackgroundResource(R.drawable.registration_details_background);
             holder.messageLayoutParent.setGravity(Gravity.END);
@@ -74,6 +75,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
             holder.messageLayoutParent.setGravity(Gravity.START);
         }
 
+        // Show / Hide sender name and profile
         if (position > 0) {
             campusActivityItem previousItem = messageList.get(position - 1);
             if (previousItem.getSenderEmail().equals(currentItem.getSenderEmail()) || isUserSender(currentItem.getSenderEmail())) {
@@ -100,6 +102,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
             return true;
         });
 
+        // Load sender info
         db.collection("users").document(currentItem.getSenderEmail())
                 .addSnapshotListener((snapshot, e) -> {
                     if (e != null) {
@@ -116,6 +119,7 @@ public class campusActivityAdapter extends RecyclerView.Adapter<campusActivityAd
                     }
                 });
 
+        // Reply Preview
         if (currentItem.getReplyMessage() != null && !currentItem.getReplyMessage().isEmpty()) {
             holder.replyLayout.setVisibility(View.VISIBLE);
             holder.replyMessage.setText(currentItem.getReplyMessage());
