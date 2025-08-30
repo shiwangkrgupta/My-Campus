@@ -12,7 +12,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -358,14 +360,29 @@ public class utility {
     }
 
     public void playSentSound(Context context) {
-        MediaPlayer mediaPlayer = MediaPlayer.create(context, R.raw.sent_sound_effect);
-        mediaPlayer.start();
+        SoundPool soundPool = new SoundPool(1, AudioManager.STREAM_NOTIFICATION, 0);
+        int soundId = soundPool.load(context, R.raw.sent_sound_effect, 1);
 
-        // Release the media player after playback finishes
-        mediaPlayer.setOnCompletionListener(mp -> {
-            mp.release();
+        soundPool.setOnLoadCompleteListener((sp, id, status) -> {
+            if (status == 0) {
+                sp.play(soundId, 1, 1, 1, 0, 1f);
+            }
         });
     }
+
+
+
+//    public void playSentSound(Context context) {
+//        MediaPlayer mediaPlayer = MediaPlayer.create(context, R.raw.sent_sound_effect);
+//        mediaPlayer.start();
+//
+//        // Release the media player after playback finishes
+//        mediaPlayer.setOnCompletionListener(mp -> {
+//            mp.release();
+//        });
+//    }
+
+
 
     public long downloadFile(Context context, String fileUrl, File file) {
         File directory = file.getParentFile();
